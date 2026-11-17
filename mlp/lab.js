@@ -139,12 +139,12 @@
     parts.push(`<g font-size="10" fill="#8a8878" text-anchor="middle"><text x="67" y="352">输入层</text><text x="260" y="352">${h?m.config.activation:'无隐藏层'}</text><text x="450" y="352">Sigmoid 输出</text></g>`);
     $('network').innerHTML=parts.join('');
   }
-  function download(name,content,type) {const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  function download(name,content,type) {const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   $('export-csv').addEventListener('click',()=>{
-    const header=['epoch','loss','accuracy',...X.map(x=>`p_${x.join('')}`),...model.names.map((_,i)=>`theta_${i}`)];
-    const rows=history.map(s=>[s.epoch,s.loss,s.accuracy,...s.predictions.map(p=>p.prob),...s.p].join(','));
-    const metadata=JSON.stringify({config:model.config,parameterOrder:model.names});
-    download('xor-training.csv','\uFEFF# '+metadata+'\n'+header.join(',')+'\n'+rows.join('\n'),'text/csv;charset=utf-8');
+    const header=['hidden','activation','optimizer','learning_rate','initialization','seed','epoch','loss','accuracy',...X.map(x=>`p_${x.join('')}`),...model.names.map((_,i)=>`theta_${i}`)];
+    const c=model.config;
+    const rows=history.map(s=>[c.hidden,c.activation,c.optimizer,c.lr,c.init,c.seed,s.epoch,s.loss,s.accuracy,...s.predictions.map(p=>p.prob),...s.p].join(','));
+    download('xor-training.csv','\uFEFF'+header.join(',')+'\n'+rows.join('\n'),'text/csv;charset=utf-8');
   });
   $('export-json').addEventListener('click',()=>download('xor-model.json',JSON.stringify({config:model.config,parameterOrder:model.names,initial:model.initial,viewedEpoch:view,snapshot:history[view],latestSnapshot:history.at(-1),trainingSet:{X,Y:[0,1,1,0]}},null,2),'application/json'));
   async function showExperiments() {
