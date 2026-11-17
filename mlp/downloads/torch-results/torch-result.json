@@ -1,0 +1,56 @@
+{
+  "framework": "PyTorch",
+  "version": "2.14.0+cu130",
+  "dtype": "float64",
+  "config": {
+    "hidden": 2,
+    "activation": "sigmoid",
+    "optimizer": "adam",
+    "lr": 0.03,
+    "epochs": 300,
+    "init": "course"
+  },
+  "initial_loss": 0.5619596535744331,
+  "final_loss": 0.02792652607940487,
+  "accuracy": 1.0,
+  "probabilities": [
+    0.02872041258963964,
+    0.9745410378517636,
+    0.9745410378517636,
+    0.030512687802188073
+  ],
+  "predictions": [
+    0,
+    1,
+    1,
+    0
+  ],
+  "parameters": {
+    "W": [
+      [
+        6.137082469836305,
+        -6.014029919190205
+      ],
+      [
+        -6.014029919190205,
+        6.137082469836305
+      ]
+    ],
+    "b_hidden": [
+      -3.472722026600329,
+      -3.472722026600329
+    ],
+    "v": [
+      [
+        8.191762770543948
+      ],
+      [
+        8.191762770543948
+      ]
+    ],
+    "b_output": [
+      -4.014124438059893
+    ]
+  },
+  "note": "All four XOR samples are training data; no held-out test set."
+}
