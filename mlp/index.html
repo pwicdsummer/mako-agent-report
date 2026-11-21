@@ -1,117 +1,174 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f5ef">
-  <title>MLP 学习实验室 · MAKO 第二次作业</title>
-  <meta name="description" content="人工智能概论第二次作业：复现第15节2→2→1 MLP的XOR参数学习，交互观察前向传播、梯度、Adam、损失曲线和决策边界，附Python源码与实验报告。">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MLP 参数学习与可视化 | 人工智能概论</title>
+  <meta name="description" content="人工智能概论第 15 节实验。用多层感知机学习 XOR，可视化训练损失、决策边界、权重与梯度。">
   <link rel="canonical" href="https://pwicdsummer.github.io/mako-agent-report/mlp/">
-  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="lab.css">
-  <script src="core.js" defer></script><script src="lab.js" defer></script>
+  <script src="core.js" defer></script>
+  <script src="lab.js" defer></script>
 </head>
 <body>
-  <a class="skip" href="#experiment">跳至交互实验</a>
-  <header class="site-header wrap">
-    <a class="brand" href="../"><span class="brand-mark">m<small>✳</small></span><span>MAKO<small>LEARNING NOTES</small></span></a>
-    <nav aria-label="页面导航"><a href="#experiment">交互实验</a><a href="#principle">学习原理</a><a href="#findings">实验记录</a><a href="#source">代码与报告</a></nav>
-    <a class="back" href="../">第一次作业 ↗</a>
-  </header>
-  <main>
-    <section class="hero wrap">
-      <div><p class="eyebrow">✳ &nbsp; 人工智能概论 · 第二次作业 &nbsp; / &nbsp; VOL. 02</p>
-        <p class="kicker">第 15 节 · MLP 学习参数的实现与可视化</p>
-        <h1>让一次学习，<br>变得<span class="underlined">看得见。</span></h1>
-        <p class="hero-description">四个 XOR 样本，九个可学习参数。<br>从一次前向计算开始，看误差如何经过梯度，<br class="wide">让小小的神经网络一步步学会异或。</p>
-        <div class="hero-actions"><a class="button primary" href="#experiment">翻开学习实验 ↗</a><a class="text-link" href="#principle">先读懂原理 ↓</a></div>
-        <p class="byline"><span class="avatar">p.</span> pwicdsummer <span>2026.11.17 · 课程实践记录</span></p>
-      </div>
-      <div class="hero-note" aria-label="实验概览：两个输入、两个隐藏节点、一个输出，学习XOR">
-        <div class="tape" aria-hidden="true"></div><p class="note-label">A SMALL NETWORK, A VISIBLE JOURNEY.</p>
-        <svg viewBox="0 0 440 230" role="img" aria-label="2到2到1多层感知器">
-          <g stroke="#a8b4a0" fill="none" stroke-width="1.7"><path d="M88 66L218 66M88 66L218 166M88 166L218 66M88 166L218 166M218 66L355 116M218 166L355 116"/></g>
-          <g fill="#f8f6ef" stroke="#7f9682" stroke-width="2"><circle cx="88" cy="66" r="25"/><circle cx="88" cy="166" r="25"/><circle cx="218" cy="66" r="25"/><circle cx="218" cy="166" r="25"/></g>
-          <circle cx="355" cy="116" r="30" fill="#e8dbb5" stroke="#b99b5e" stroke-width="2"/>
-          <g fill="#465f50" text-anchor="middle" font-size="19" font-family="Georgia,serif"><text x="88" y="72">x₁</text><text x="88" y="172">x₂</text><text x="218" y="72">h₁</text><text x="218" y="172">h₂</text><text x="355" y="123">ŷ</text></g>
-          <g fill="#78786a" text-anchor="middle" font-size="11"><text x="88" y="218">输入</text><text x="218" y="218">Sigmoid 隐藏层</text><text x="355" y="218">输出概率</text></g>
-        </svg>
-        <div class="xor-note"><span>00 → 0</span><span>01 → 1</span><span>10 → 1</span><span>11 → 0</span></div>
-        <p class="handnote">不是记下答案，是让参数学会变化。 <span>✧</span></p>
-      </div>
-    </section>
-    <div class="course-strip wrap"><span><i></i> 对照课程第 15 节实现</span><span><b>2 → 2 → 1</b> 默认网络</span><span><b>Adam · 0.03</b> 默认优化</span><span><b>300</b> 默认训练轮数</span></div>
+  <a class="skip" href="#experiment">跳至训练实验</a>
+  <main class="wrap">
+    <header class="page-header">
+      <p class="course">人工智能概论 · 第 15 节实验</p>
+      <h1>MLP 参数学习与可视化</h1>
+      <p>使用 2 → 2 → 1 多层感知机训练 XOR。课程配置使用 Sigmoid、二元交叉熵和 Adam（学习率 0.03），整批训练 300 轮。</p>
+      <p class="baseline">默认实验结果：训练 BCE <strong>0.561960 → 0.027927</strong>，训练准确率 <strong>50% → 100%</strong>。</p>
+      <nav aria-label="页内导航">
+        <a href="#experiment">交互训练</a>
+        <a href="#principle">算法</a>
+        <a href="#findings">对照结果</a>
+        <a href="#source">源码</a>
+        <a href="report.html">实验报告</a>
+      </nav>
+    </header>
 
-    <section class="section wrap" id="experiment">
-      <div class="section-heading"><div><p class="eyebrow">01 &nbsp; / &nbsp; THE LEARNING LAB</p><h2>把参数交给数据，<em>把过程留在眼前。</em></h2></div><p>真实计算 · 浏览器本地运行<br>每一帧，都来自当前网络的参数。</p></div>
+    <section class="section" id="experiment">
+      <h2>交互训练</h2>
       <div class="lab-shell">
-        <div class="lab-title"><span><i></i> XOR · 参数学习工作台</span><span class="pill">4 个样本 / 整批训练</span></div>
         <form id="config" class="controls">
-          <label>隐藏单元<select name="hidden" id="hidden"><option value="2">2 个 · 课程结构</option><option value="4">4 个</option><option value="8">8 个</option><option value="0">0 个 · 线性对照</option></select></label>
-          <label>隐藏层激活<select name="activation" id="activation"><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></label>
-          <label>优化器<select name="optimizer" id="optimizer"><option value="adam">Adam</option><option value="sgd">SGD</option></select></label>
-          <label>学习率 η<select name="lr" id="lr"><option value="0.003">0.003</option><option value="0.01">0.01</option><option value="0.03" selected>0.03 · 课程设置</option><option value="0.1">0.1</option><option value="0.3">0.3</option></select></label>
-          <label>训练轮数<select name="epochs" id="epochs"><option value="300">300</option><option value="1000">1,000</option><option value="2000">2,000</option></select></label>
-          <label>初始化<select name="init" id="init"><option value="course">课程给定参数</option><option value="random">随机 · 固定种子 42</option></select></label>
+          <label for="hidden">隐藏单元<select name="hidden" id="hidden"><option value="2">2</option><option value="4">4</option><option value="8">8</option><option value="0">0（线性对照）</option></select></label>
+          <label for="activation">隐藏层激活<select name="activation" id="activation"><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></label>
+          <label for="optimizer">优化器<select name="optimizer" id="optimizer"><option value="adam">Adam</option><option value="sgd">SGD</option></select></label>
+          <label for="lr">学习率<select name="lr" id="lr"><option value="0.003">0.003</option><option value="0.01">0.01</option><option value="0.03" selected>0.03</option><option value="0.1">0.1</option><option value="0.3">0.3</option></select></label>
+          <label for="epochs">训练轮数<select name="epochs" id="epochs"><option value="300">300</option><option value="1000">1,000</option><option value="2000">2,000</option></select></label>
+          <label for="init">初始化<select name="init" id="init"><option value="course">课程给定参数</option><option value="random">随机（种子 42）</option></select></label>
         </form>
-        <p id="config-note" class="config-note">课程给定参数的初始准确率为 50%；训练先学会四个样本的分类，再提高预测置信度。也可切换固定种子的随机初始化。</p>
-        <div class="action-bar"><div class="action-buttons"><button class="button primary" id="run">▶ 开始训练</button><button class="button secondary" id="step">单步 +1</button><button class="button ghost" id="reset">↺ 重置</button></div><span id="run-status" role="status" aria-live="polite">准备就绪 · 可先单步观察一次更新</span></div>
-        <div class="metric-grid"><div><span>当前轮数 EPOCH</span><strong id="metric-epoch">0 <small>/ 300</small></strong></div><div><span>平均二元交叉熵 BCE</span><strong id="metric-loss">—</strong></div><div><span>四样本训练准确率</span><strong id="metric-accuracy">—</strong></div><div><span>可学习参数</span><strong id="metric-params">9 <small>个</small></strong></div></div>
-        <div class="history-bar"><label for="timeline">回看训练 <output id="timeline-value">第 0 轮</output></label><input type="range" id="timeline" min="0" max="0" value="0" aria-label="选择要回看的训练轮数"><button id="latest" class="text-button">回到最新 ↗</button></div>
-
-        <div class="visual-grid">
-          <article class="viz-card"><div class="card-heading"><h3>01 / 决策边界</h3><span>输入空间 x₁ × x₂</span></div><div class="canvas-wrap decision-wrap"><canvas id="decision" width="520" height="370" role="img" aria-label="XOR决策边界：颜色表示预测概率，圆点表示目标0，菱形表示目标1"></canvas></div><div class="legend"><span><i class="class-zero"></i>目标 0 · 圆点</span><span><i class="class-one"></i>目标 1 · 菱形</span><span class="prob-scale">P(1) <b></b> 0 → 1</span></div><p class="chart-note">白色等值线：P(1) = 0.5。点击图中位置，可查看该输入的前向计算。</p></article>
-          <article class="viz-card"><div class="card-heading"><h3>02 / 网络与权重</h3><span id="network-count">2 → 2 → 1</span></div><div class="network-wrap"><svg id="network" viewBox="0 0 520 370" role="img" aria-label="当前MLP权重与节点激活值"></svg></div><div class="legend"><span><i class="positive"></i>正权重</span><span><i class="negative"></i>负权重</span><span>线越粗，绝对值越大</span></div><p class="chart-note">节点显示所选输入的激活值；悬停或聚焦连线可读权重、偏置见下方参数表。</p></article>
-          <article class="viz-card"><div class="card-heading"><h3>03 / 损失曲线</h3><span>同一训练任务的真实记录</span></div><div class="canvas-wrap loss-wrap"><canvas id="loss-chart" width="520" height="250" role="img" aria-label="平均二元交叉熵随训练轮数变化的折线图"></canvas></div><p class="chart-note">纵轴为四样本平均 BCE，横轴为参数更新次数。圆点标记当前回看的轮次。</p></article>
-          <article class="viz-card"><div class="card-heading"><h3>04 / 四个样本的预测</h3><span>以 P(1) ≥ 0.5 判为 1</span></div><div class="table-scroll"><table class="prediction-table"><thead><tr><th>输入</th><th>目标</th><th>P(1)</th><th>分类</th></tr></thead><tbody id="predictions"></tbody></table></div><p class="chart-note" id="prediction-note">点击任意样本行，将输入送进右上方的网络。</p></article>
+        <p id="config-note" class="config-note" hidden></p>
+        <div class="action-bar">
+          <div class="action-buttons">
+            <button class="button primary" id="run">开始训练</button>
+            <button class="button" id="step">单步 +1</button>
+            <button class="button" id="reset">重置</button>
+            <button class="text-button" id="restore-course">恢复课程配置</button>
+          </div>
+          <span id="run-status" role="status"></span>
         </div>
-        <div class="probe"><span>送入一个输入</span><div id="sample-buttons" class="sample-buttons" role="group" aria-label="选择XOR样本"><button data-sample="0" aria-pressed="false">0, 0</button><button data-sample="1" aria-pressed="true" class="selected">0, 1</button><button data-sample="2" aria-pressed="false">1, 0</button><button data-sample="3" aria-pressed="false">1, 1</button></div><output id="probe-result">—</output></div>
-        <details class="parameter-details" open><summary>九个参数，究竟怎样变化？ <span id="parameter-caption">当前轮次的权重与梯度</span></summary><p class="chart-note">梯度在当前显示参数处计算，表示损失对参数的瞬时变化率；Δ 是最近一次更新的实际步长。第 0 轮尚未更新，Δ 为 0。</p><div class="table-scroll"><table class="parameter-table"><thead><tr><th>参数</th><th>初始值 θ₀</th><th>当前值 θₜ</th><th>当前梯度 ∂L/∂θₜ</th><th>上次更新 Δθₜ</th></tr></thead><tbody id="parameters"></tbody></table></div></details>
-        <div class="lab-bottom"><p>所有实验使用 XOR 的全部四个真值表样本；准确率表示训练集拟合效果。</p><div><button class="text-button" id="export-csv">下载本次记录 CSV ↓</button><button class="text-button" id="export-json">下载模型 JSON ↓</button></div></div>
-        <noscript><p class="noscript">启用 JavaScript 即可运行交互实验。下方实验记录和下载代码可直接阅读。</p></noscript>
+        <div class="metric-grid">
+          <div><span>训练轮数</span><strong id="metric-epoch">0 <small>/ 300</small></strong></div>
+          <div><span>平均 BCE</span><strong id="metric-loss">—</strong></div>
+          <div><span>训练准确率</span><strong id="metric-accuracy">—</strong></div>
+          <div><span>参数数量</span><strong id="metric-params">9 <small>个</small></strong></div>
+        </div>
+        <div class="history-bar">
+          <label for="timeline">回看轮次 <output id="timeline-value" for="timeline">第 0 轮</output></label>
+          <input type="range" id="timeline" min="0" max="0" value="0">
+          <button id="latest" class="text-button">回到最新</button>
+        </div>
+        <div class="visual-grid">
+          <article class="viz-card">
+            <div class="card-heading"><h3>决策边界</h3><span>x₁ × x₂</span></div>
+            <div class="canvas-wrap"><canvas id="decision" width="520" height="370" role="img" aria-label="XOR 决策边界。圆点为目标 0，菱形为目标 1。"></canvas></div>
+            <div class="legend"><span><i class="class-zero"></i>目标 0</span><span><i class="class-one"></i>目标 1</span><span class="prob-scale">P(1) <b></b> 0 → 1</span></div>
+            <p class="chart-note">白线表示 P(1) = 0.5。点击图面可选取输入。</p>
+          </article>
+          <article class="viz-card">
+            <div class="card-heading"><h3>网络权重与激活值</h3><span id="network-count">2 → 2 → 1</span></div>
+            <div class="network-wrap"><svg id="network" viewBox="0 0 520 370" role="img" aria-label="当前权重与节点激活值"></svg></div>
+            <div class="legend"><span><i class="positive"></i>正权重</span><span><i class="negative"></i>负权重</span><span>线宽表示权重绝对值</span></div>
+            <p class="chart-note">节点显示当前输入的激活值。将鼠标移到连线上可查看权重。</p>
+          </article>
+          <article class="viz-card">
+            <div class="card-heading"><h3>训练损失</h3></div>
+            <div class="canvas-wrap"><canvas id="loss-chart" width="520" height="250" role="img" aria-label="平均二元交叉熵随训练轮数变化"></canvas></div>
+            <p class="chart-note">圆点为当前查看的轮次。</p>
+          </article>
+          <article class="viz-card">
+            <div class="card-heading"><h3>样本预测</h3><span>P(1) ≥ 0.5 判为 1</span></div>
+            <div class="table-scroll">
+              <table class="prediction-table">
+                <thead><tr><th scope="col">输入</th><th scope="col">目标</th><th scope="col">P(1)</th><th scope="col">分类</th></tr></thead>
+                <tbody id="predictions"></tbody>
+              </table>
+            </div>
+            <p class="chart-note">点击输入可查看对应的激活值。</p>
+          </article>
+        </div>
+        <div class="probe">
+          <span>选择输入</span>
+          <div id="sample-buttons" class="sample-buttons" role="group" aria-label="选择 XOR 样本">
+            <button class="button" data-sample="0" aria-pressed="false">0, 0</button>
+            <button class="button" data-sample="1" aria-pressed="true">0, 1</button>
+            <button class="button" data-sample="2" aria-pressed="false">1, 0</button>
+            <button class="button" data-sample="3" aria-pressed="false">1, 1</button>
+          </div>
+          <output id="probe-result">—</output>
+        </div>
+        <details class="parameter-details" open>
+          <summary>参数与梯度 <span id="parameter-caption"></span></summary>
+          <p class="chart-note">梯度按当前参数计算。第 0 轮的更新量为 0。</p>
+          <div class="table-scroll">
+            <table class="parameter-table">
+              <thead><tr><th scope="col">参数</th><th scope="col">初始值</th><th scope="col">当前值</th><th scope="col">当前梯度</th><th scope="col">上次更新量</th></tr></thead>
+              <tbody id="parameters"></tbody>
+            </table>
+          </div>
+        </details>
+        <div class="lab-bottom">
+          <button class="text-button" id="export-csv">下载训练记录（CSV）</button>
+          <button class="text-button" id="export-json">下载模型（JSON）</button>
+        </div>
+        <noscript><p class="lab-bottom">交互训练需要 JavaScript。<a href="report.html">查看实验报告</a></p></noscript>
       </div>
-      <aside class="margin-tip"><span>✧</span><p><b>试着做一个对照。</b>把“隐藏单元”改为 0，运行后观察损失停在 ln 2 ≈ 0.6931；再恢复课程设置，看隐藏层怎样形成弯折的边界。</p><button class="text-button" id="restore-course">恢复课程设置 ↗</button></aside>
     </section>
 
-    <section class="principle-section" id="principle"><div class="section wrap">
-      <div class="section-heading"><div><p class="eyebrow">02 &nbsp; / &nbsp; UNDER THE HOOD</p><h2>从一个预测，<em>走到下一次更新。</em></h2></div><p>模型负责表达，损失衡量偏差。<br>反向传播求梯度，优化器改变参数。</p></div>
-      <div class="steps-grid">
-        <article><span class="step-number">01</span><h3>准备数据与参数</h3><p>输入 X ∈ ℝ⁴ˣ²，标签 y = [0, 1, 1, 0]ᵀ。W 有 4 个权重，bₕ 有 2 个偏置，v 有 2 个权重，bₒ 有 1 个偏置，共 9 个参数。</p><div class="formula">W = [[2, −2], [−2, 2]]<br>bₕ = [−1, −1]<br>v = [3, 3]ᵀ &nbsp; bₒ = −2.5</div></article>
-        <article><span class="step-number">02</span><h3>前向传播与损失</h3><p>Sigmoid 隐藏层组合两个输入，输出层产生分数 zₒ，再转为概率。BCE 衡量预测概率与目标标签的差异。</p><div class="formula">H = σ(XW + bₕ)<br>zₒ = Hv + bₒ &nbsp; p = σ(zₒ)<br>L = −mean[y ln p + (1−y) ln(1−p)]</div></article>
-        <article><span class="step-number">03</span><h3>链式法则反向求导</h3><p>从输出误差向前传递，得到每个参数对平均损失的梯度。这里 δₒ 已除以样本数 N = 4，后续求和无需再除。</p><div class="formula">δₒ = (p − y) / N<br>∇v = Hᵀδₒ &nbsp; ∇bₒ = Σδₒ<br>δₕ = (δₒvᵀ) ⊙ H ⊙ (1−H)<br>∇W = Xᵀδₕ &nbsp; ∇bₕ = Σδₕ</div></article>
-        <article><span class="step-number">04</span><h3>Adam 更新，重复学习</h3><p>Adam 累积梯度的一、二阶矩，并作偏差修正。框架示例由 autograd / GradientTape 求导；网页显式实现同样的梯度。</p><div class="formula">mₜ = .9mₜ₋₁ + .1gₜ<br>vₜ = .999vₜ₋₁ + .001gₜ²<br>m̂ₜ = mₜ / (1−.9ᵗ)<br>v̂ₜ = vₜ / (1−.999ᵗ)<br>θₜ = θₜ₋₁ − ηm̂ₜ / (√v̂ₜ + 10⁻⁸)</div></article>
+    <section class="section" id="principle">
+      <h2>算法</h2>
+      <p>四个 XOR 样本按 (0,0)、(0,1)、(1,0)、(1,1) 排列，标签为 0、1、1、0。默认网络包含 9 个参数。</p>
+      <div class="method-grid">
+        <div>
+          <h3>前向传播</h3>
+          <pre>H = σ(XW + bₕ)
+p = σ(Hv + bₒ)
+L = −mean[y ln p + (1−y) ln(1−p)]</pre>
+        </div>
+        <div>
+          <h3>反向传播</h3>
+          <pre>δₒ = (p − y) / 4
+∇v = Hᵀδₒ,  ∇bₒ = Σδₒ
+δₕ = (δₒvᵀ) ⊙ H ⊙ (1−H)
+∇W = Xᵀδₕ,  ∇bₕ = Σδₕ</pre>
+        </div>
+        <div>
+          <h3>Adam 更新</h3>
+          <pre>gₜ = ∇L(θₜ₋₁)
+mₜ = 0.9mₜ₋₁ + 0.1gₜ
+sₜ = 0.999sₜ₋₁ + 0.001gₜ²
+m̂ₜ = mₜ / (1−0.9ᵗ),  ŝₜ = sₜ / (1−0.999ᵗ)
+θₜ = θₜ₋₁ − ηm̂ₜ / (√ŝₜ + 10⁻⁸)</pre>
+        </div>
       </div>
-      <div class="why-xor"><p class="small-label">WHY A HIDDEN LAYER?</p><h3>相同标签分布在对角，一条直线无法分开。</h3><p>没有隐藏层时，p = σ(w₁x₁ + w₂x₂ + b) 的分类边界始终是一条直线。隐藏层先构造非线性特征，再由输出层组合，从而拟合 XOR。这里使用可微的 Sigmoid，才能通过链式法则训练；阈值只用于最后的分类判断。</p></div>
-    </div></section>
-
-    <section class="section wrap" id="findings">
-      <div class="section-heading"><div><p class="eyebrow">03 &nbsp; / &nbsp; FIELD OBSERVATIONS</p><h2>不只看答案，<em>也记录发生了什么。</em></h2></div><p>预先运行并保存的可复现实验。<br>均使用 300 轮、四样本整批训练。</p></div>
-      <div class="experiment-table table-scroll"><table><thead><tr><th>实验设置</th><th>初始 BCE</th><th>最终 BCE</th><th>最终准确率</th><th>复现</th></tr></thead><tbody id="experiment-results"><tr><td>课程配置 · Adam 0.03</td><td colspan="4">读取实验记录中…</td></tr></tbody></table></div>
-      <div class="observations"><article><span>↳ 观察一</span><h3>准确率相同，损失仍会下降。</h3><p id="observation-confidence">训练达到 100% 准确率后，学习仍会把正确类别的概率推向更可信的值。所以必须同时看交叉熵与预测概率，而不只看分类是否正确。</p></article><article><span>↳ 观察二</span><h3>参数设置会改变学习速度。</h3><p>固定数据和初始化后，只改变学习率或优化器，比较同样 300 轮之后的 BCE。学习率并非越大越好；单次小规模实验不能推出所有任务的最佳设置。</p></article><article><span>↳ 观察三</span><h3>拟合真值表，不等于证明泛化。</h3><p>本实验穷举四个布尔输入，没有独立测试集。图上连续区域只是模型在非布尔坐标处的延伸，不能据此声称获得了测试准确率或真实任务的泛化能力。</p></article></div>
-      <p class="source-note">结果由本页同一份计算核心生成，保留完整精度。<a href="experiments.json" download>下载预运行结果与最终参数 JSON ↓</a></p>
     </section>
 
-    <section class="source-section" id="source"><div class="section wrap">
-      <div class="section-heading"><div><p class="eyebrow">04 &nbsp; / &nbsp; REPRODUCE THE LEARNING</p><h2>让实现，<em>也能被检查与复现。</em></h2></div><p>网页交互 + 框架实现 + 实验报告<br>从看到过程，到运行代码。</p></div>
-      <div class="download-grid"><a class="download-card" href="downloads/xor_torch.py" download><span class="file-tag">PYTHON / PYTORCH</span><h3>autograd + Adam <span>↓</span></h3><p>与课程同样的初始化和 float64；输出概率、9 个参数、训练 CSV 与损失图。</p><span class="file-name">xor_torch.py</span></a><a class="download-card" href="downloads/xor_tensorflow.py" download><span class="file-tag">PYTHON / TENSORFLOW</span><h3>GradientTape + Adam <span>↓</span></h3><p>同样的 2→2→1 网络，使用自动微分；输出预测、参数、CSV 与损失图。</p><span class="file-name">xor_tensorflow.py</span></a><a class="download-card" href="report.html"><span class="file-tag">EXPERIMENT REPORT</span><h3>完整实验报告 <span>↗</span></h3><p>任务、公式、复现命令、实验数据、结果分析与学习总结，可打印为 PDF。</p><span class="file-name">查看报告 / 打印保存</span></a></div>
-      <details class="code-details"><summary>展开查看：Python 核心训练循环</summary><pre><code>optimizer = torch.optim.Adam(parameters, lr=0.03)
-for epoch in range(1, 301):
-    optimizer.zero_grad(set_to_none=True)
-    hidden = torch.sigmoid(x @ W + b_hidden)
-    logits = hidden @ v + b_output
-    loss = F.binary_cross_entropy_with_logits(logits, target)
-    loss.backward()       # 反向传播：计算每个参数的梯度
-    optimizer.step()      # Adam：更新参数
+    <section class="section" id="findings">
+      <h2>对照结果</h2>
+      <p>各组均整批训练 300 轮。准确率按四个训练样本计算。</p>
+      <div class="experiment-table table-scroll">
+        <table>
+          <thead><tr><th scope="col">配置</th><th scope="col">初始 BCE</th><th scope="col">最终 BCE</th><th scope="col">训练准确率</th><th scope="col">复现</th></tr></thead>
+          <tbody id="experiment-results"><tr><td colspan="5">正在加载实验结果…</td></tr></tbody>
+        </table>
+      </div>
+      <p id="observation-confidence" class="compact-note">默认配置在第 2 轮达到 100% 训练准确率，BCE 随后继续下降。</p>
+      <p class="compact-note">无隐藏层对照的四个输出均为 0.5，BCE 保持在 ln 2。XOR 的两类样本无法用一条直线完全分开。</p>
+      <p><a href="experiments.json" download>下载六组实验数据（JSON）</a></p>
+    </section>
 
-# 使用更新后的参数重新计算并记录损失与预测。</code></pre></details>
-      <div class="reproduce"><div><h3>在自己的电脑复现</h3><p>需要 Python 3.10+。两个框架任选其一；默认 300 轮，可用 <code>--epochs</code> 和 <code>--lr</code> 调整。脚本会把结果保存到 <code>xor-results/</code>。</p></div><pre><code>python -m pip install torch matplotlib
-python xor_torch.py --epochs 300 --lr 0.03
-
-# 或使用 TensorFlow
-python -m pip install tensorflow matplotlib
-python xor_tensorflow.py --epochs 300 --lr 0.03</code></pre></div>
-      <p class="source-note">课程依据：<a href="https://zhumy.github.io/Introduction_to_Artificial_Intelligence/#chapter-15" target="_blank" rel="noopener">《人工智能概论》第二篇 · 第 15 节，尤其第 66 页“多层网络怎样学习参数？” ↗</a><br>网页计算源码：<a href="core.js">core.js</a> · <a href="lab.js">lab.js</a> · <a href="https://github.com/pwicdsummer/mako-agent-report/tree/main/mlp" target="_blank" rel="noopener">GitHub 仓库 ↗</a></p>
-    </div></section>
+    <section class="section" id="source">
+      <h2>源码与报告</h2>
+      <ul class="resource-list">
+        <li><a href="report.html">实验报告</a></li>
+        <li><a href="downloads/xor_torch.py" download>PyTorch 脚本</a></li>
+        <li><a href="downloads/xor_tensorflow.py" download>TensorFlow 脚本</a></li>
+        <li><a href="core.js">网页训练实现（JavaScript）</a></li>
+        <li><a href="https://zhumy.github.io/Introduction_to_Artificial_Intelligence/#chapter-15">课程讲义 · 第 15 节</a></li>
+      </ul>
+    </section>
+    <footer class="page-footer">pwicdsummer</footer>
   </main>
-  <footer class="footer wrap"><div><a class="brand-footer" href="../">MAKO <span>Learning Notes</span></a><p>© 2026 pwicdsummer · 保持好奇，慢慢构建。</p></div><span>作业 02 / MLP 参数学习与可视化</span><a class="text-link" href="#">回到页首 ↑</a></footer>
 </body>
 </html>

@@ -1,82 +1,118 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>第二次作业实验报告 · MLP 参数学习与可视化</title><link rel="icon" href="../assets/favicon.svg"><link rel="stylesheet" href="lab.css"><style>
-.report{max-width:900px;margin:0 auto;padding:45px 30px 70px}.report-nav{display:flex;justify-content:space-between;gap:20px;margin-bottom:45px;font-size:12px;color:var(--green)}.report h1{font-size:36px;line-height:1.65;letter-spacing:-.7px}.report h2{font-size:23px;border-bottom:1px solid var(--line);padding-bottom:10px;margin:40px 0 20px}.report h3{font:500 18px/1.7 var(--serif);margin:25px 0 12px}.report p,.report li{font-size:12px;line-height:2.1;margin-bottom:13px}.report ul,.report ol{padding-left:22px}.report .meta{color:var(--muted);font-size:10px;margin:17px 0 25px}.report .lead{border-left:3px solid var(--green);padding:18px 22px;background:var(--sage)}.report pre{padding:20px;background:#eeefe4;border-radius:6px;margin-block:17px}.report table{font-size:11px}.report td{padding-block:10px}.report a{text-decoration:underline;text-underline-offset:4px;text-decoration-color:#b7c5ad}.report figure{margin:20px 0}.report figure svg{width:100%;height:auto;display:block}.report figcaption{font-size:10px;color:var(--muted);text-align:center}.report img{width:100%;height:auto;border:1px solid var(--line)}.report .note{color:var(--muted);font-size:11px}@media(max-width:600px){.report{padding:25px 20px 45px}.report h1{font-size:27px}.report h2{font-size:21px}.report pre{padding:15px;font-size:10px}.report table{min-width:470px}}@media print{.report{padding:0;max-width:none}.report-nav{display:none}.report h1{font-size:24px}.report h2{font-size:17px;margin-top:24px;break-after:avoid}.report p,.report li{font-size:10px;line-height:1.8}.report table{min-width:0}.report td{padding-block:6px}.report figure,.report tr{break-inside:avoid}.report pre{font-size:9px;white-space:pre-wrap}}
-</style></head><body><main class="report">
-<nav class="report-nav"><a href="./">← 返回 MLP 学习实验室</a><button class="text-button" onclick="window.print()">打印 / 保存为 PDF ↓</button></nav>
-<p class="eyebrow">MAKO · LEARNING NOTES / ASSIGNMENT 02</p><h1>MLP 学习参数的实现与可视化<br>——基于 XOR 的实验报告</h1>
-<p class="meta">作者：pwicdsummer &nbsp; · &nbsp; 日期：2026 年 11 月 17 日 &nbsp; · &nbsp; 课程：《人工智能概论》第二篇第 15 节</p>
-<p class="lead">本作业复现课程中的 2→2→1 MLP，使用 Sigmoid、二元交叉熵和 Adam，以学习率 0.03 训练 300 轮。四个 XOR 训练样本的准确率从 50% 提升到 100%，平均 BCE 从 0.561960 降至 0.027927。网页实现可交互展示参数、梯度、决策边界和损失，另附可运行的 PyTorch 与 TensorFlow 脚本。</p>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MLP 参数学习与可视化 · 实验报告</title>
+  <link rel="stylesheet" href="lab.css">
+</head>
+<body>
+  <main class="report wrap">
+    <header class="page-header">
+      <p class="course">人工智能概论 · 第 15 节实验 · pwicdsummer</p>
+      <h1>MLP 参数学习与可视化实验报告</h1>
+      <p>用 2 → 2 → 1 多层感知机学习 XOR。训练 300 轮后，二元交叉熵（BCE）从 <strong>0.561960</strong> 降到 <strong>0.027927</strong>，四个训练样本全部分类正确。</p>
+      <nav aria-label="报告操作">
+        <a href="./">返回交互实验</a>
+        <button class="text-button" onclick="window.print()">打印 / 保存 PDF</button>
+      </nav>
+    </header>
 
-<h2>一、实验任务与目标</h2>
-<p>根据“第二篇 15 节 MLP 学习参数的实现和可视化，并展示在自己的网站上”的要求，完成从数据、模型、损失、反向求导到参数更新的完整流程。以 XOR 为例，解释单层模型的局限，以及隐藏层如何形成非线性表示。</p>
-<p>作业展示地址：<a href="https://pwicdsummer.github.io/mako-agent-report/mlp/">https://pwicdsummer.github.io/mako-agent-report/mlp/</a>；第一次作业的首页设有第二次作业入口。</p>
+    <section class="section">
+      <h2>数据与配置</h2>
+      <p>输入依次为 (0,0)、(0,1)、(1,0)、(1,1)，标签为 0、1、1、0。四个样本组成一个批次。P(1) ≥ 0.5 判为 1。</p>
+      <pre>隐藏层：2 个 Sigmoid 单元
+初始参数：W = [[2, −2], [−2, 2]], bₕ = [−1, −1], v = [3, 3]ᵀ, bₒ = −2.5
+优化器：Adam，η = 0.03，β₁ = 0.9，β₂ = 0.999，ε = 10⁻⁸
+训练轮数：300    数值精度：float64</pre>
+    </section>
 
-<h2>二、数据、网络与超参数</h2>
-<p>输入顺序为 (0,0)、(0,1)、(1,0)、(1,1)，标签依次为 0、1、1、0。四个样本整批训练，无独立验证集或测试集。判断规则为 P(1) ≥ 0.5 输出 1，否则输出 0。</p>
-<pre>X = [[0,0], [0,1], [1,0], [1,1]]    y = [[0], [1], [1], [0]]
-W = [[2, -2], [-2, 2]]              b_hidden = [-1, -1]
-v = [[3], [3]]                     b_output = [-2.5]
-网络：2 个输入 → 2 个 Sigmoid 隐藏单元 → 1 个输出
-优化：Adam；η = 0.03；β₁ = 0.9；β₂ = 0.999；ε = 10⁻⁸
-精度：float64；轮数：300；批量大小：4；参数数：4 + 2 + 2 + 1 = 9</pre>
-<p>W 的行对应输入特征、列对应隐藏单元，与课程的 XW 写法一致。网页没有调用预训练模型；所有参数均通过当前实验的真实梯度更新。</p>
+    <section class="section">
+      <h2>实现方法</h2>
+      <p>前向传播计算隐藏激活 H = σ(XW + bₕ)、输出分数 z = Hv + bₒ 和概率 p = σ(z)。损失按 logits 计算，使用稳定形式 mean(max(z, 0) + log1p(exp(−|z|)) − yz)。</p>
+      <pre>δₒ = (p − y) / 4
+∇v = Hᵀδₒ,  ∇bₒ = Σδₒ
+δₕ = (δₒvᵀ) ⊙ H ⊙ (1−H)
+∇W = Xᵀδₕ,  ∇bₕ = Σδₕ</pre>
+      <p>反向传播计算四组参数的梯度，Adam 对梯度的一阶矩与二阶矩做偏差修正后更新参数。网页手写求导，Python 版本使用 PyTorch autograd 或 TensorFlow GradientTape。</p>
+      <p>第一步中，W₁₁ 的梯度为 -0.036743934。Adam 将 W₁₁ 从 2 更新至约 2.030000。可在交互页选择「单步 +1」核对。</p>
+    </section>
 
-<h2>三、学习参数的方法</h2>
-<h3>1. 前向计算与二元交叉熵</h3>
-<pre>H = σ(XW + b_hidden)
-z = Hv + b_output，p = σ(z)，σ(u) = 1 / (1 + exp(−u))
-L = −(1/N) Σ[yᵢ ln pᵢ + (1−yᵢ) ln(1−pᵢ)]，N = 4</pre>
-<p>实际计算采用对数几率上的稳定形式 L = mean(max(z,0) + log(1 + exp(−|z|)) − yz)，避免直接对接近 0 的概率取对数。</p>
-<h3>2. 反向传播</h3>
-<pre>δ_output = (p − y) / N
-∂L/∂v = Hᵀδ_output，∂L/∂b_output = Σδ_output
-δ_hidden = (δ_output vᵀ) ⊙ H ⊙ (1−H)
-∂L/∂W = Xᵀδ_hidden，∂L/∂b_hidden = Σδ_hidden</pre>
-<p>反向传播依据链式法则求梯度；求梯度本身不改变参数。PyTorch 使用 loss.backward()，TensorFlow 使用 GradientTape，网页在 core.js 中显式实现以上公式。</p>
-<h3>3. Adam 更新</h3>
-<pre>gₜ = ∇L(θₜ₋₁)
-mₜ = β₁mₜ₋₁ + (1−β₁)gₜ
-sₜ = β₂sₜ₋₁ + (1−β₂)gₜ²
-m̂ₜ = mₜ/(1−β₁ᵗ)，ŝₜ = sₜ/(1−β₂ᵗ)
-θₜ = θₜ₋₁ − η m̂ₜ/(√ŝₜ + ε)</pre>
-<p>这里使用 s 表示 Adam 的二阶矩，以免与网络输出权重 v 混淆。所有梯度均先根据同一组旧参数计算，再一次性更新各参数。每轮记录的是更新后的损失，另保留第 0 轮的初始状态。</p>
-<h3>4. 一次可检查的数值更新</h3>
-<p>初始 W₁₁ = 2，平均损失对它的梯度为 -0.036743934。Adam 的第一次偏差修正得到 m̂₁ = g₁，ŝ₁ = g₁²，因此 W₁₁ 更新到约 2.030000。网页“单步 +1”可查看这一步及其余八个参数。</p>
+    <section class="section">
+      <h2>默认配置结果</h2>
+      <p>第 2 轮达到 100% 训练准确率，BCE 为 0.541434。分类结果随后保持不变，BCE 继续下降。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">输入</th><th scope="col">目标</th><th scope="col">初始 P(1)</th><th scope="col">最终 P(1)</th><th scope="col">最终分类</th></tr></thead>
+          <tbody><tr><td>(0, 0)</td><td>0</td><td>0.291863</td><td>0.028720</td><td>0</td></tr>
+<tr><td>(0, 1)</td><td>1</td><td>0.458956</td><td>0.974541</td><td>1</td></tr>
+<tr><td>(1, 0)</td><td>1</td><td>0.458956</td><td>0.974541</td><td>1</td></tr>
+<tr><td>(1, 1)</td><td>0</td><td>0.291863</td><td>0.030513</td><td>0</td></tr></tbody>
+        </table>
+      </div>
+      <figure>
+        <img src="downloads/torch-results/torch-learning.png" alt="PyTorch 训练损失曲线和 XOR 最终决策边界" width="1800" height="720">
+        <figcaption>PyTorch 训练损失与最终决策边界。圆点为目标 0，菱形为目标 1。</figcaption>
+      </figure>
+      <h3>参数变化</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">参数</th><th scope="col">初始值</th><th scope="col">第 300 轮</th></tr></thead>
+          <tbody><tr><td>W[1,1]</td><td>+2.000000</td><td>+6.137082</td></tr>
+<tr><td>W[1,2]</td><td>-2.000000</td><td>-6.014030</td></tr>
+<tr><td>W[2,1]</td><td>-2.000000</td><td>-6.014030</td></tr>
+<tr><td>W[2,2]</td><td>+2.000000</td><td>+6.137082</td></tr>
+<tr><td>bₕ[1]</td><td>-1.000000</td><td>-3.472722</td></tr>
+<tr><td>bₕ[2]</td><td>-1.000000</td><td>-3.472722</td></tr>
+<tr><td>v[1]</td><td>+3.000000</td><td>+8.191763</td></tr>
+<tr><td>v[2]</td><td>+3.000000</td><td>+8.191763</td></tr>
+<tr><td>bₒ</td><td>-2.500000</td><td>-4.014124</td></tr></tbody>
+        </table>
+      </div>
+      <p>训练后 h₁ 对 (1,0) 的激活约为 0.934891，h₂ 对 (0,1) 的激活也达到该值。两个隐藏单元对 (0,0) 与 (1,1) 的激活均低于 0.034。</p>
+    </section>
 
-<h2>四、基准实验结果</h2>
-<p>第 2 轮首次达到 100% 训练准确率，此时 BCE 仍有 0.541434。之后准确率保持 100%，损失继续下降，说明“分类正确”和“预测置信度高”并不等价。</p>
-<figure><svg viewBox="0 0 740 295" role="img" aria-label="默认实验300轮的真实交叉熵损失曲线"><rect x="0" y="0" width="740" height="295" fill="#fcfbf6"/>
-<g stroke="#dfe4d6"><path d="M55 245.0H695"/><path d="M55 192.5H695"/><path d="M55 140.0H695"/><path d="M55 87.5H695"/><path d="M55 35.0H695"/></g>
-<g fill="#78776d" font-size="11" text-anchor="end"><text x="45" y="249.0">0.00</text><text x="45" y="196.5">0.15</text><text x="45" y="144.0">0.30</text><text x="45" y="91.5">0.45</text><text x="45" y="39.0">0.60</text></g>
-<path d="M55.00,48.31 L57.13,52.21 L59.27,55.50 L61.40,58.55 L63.53,61.56 L65.67,64.52 L67.80,67.45 L69.93,70.33 L72.07,73.18 L74.20,75.98 L76.33,78.73 L78.47,81.44 L80.60,84.10 L82.73,86.71 L84.87,89.27 L87.00,91.79 L89.13,94.25 L91.27,96.66 L93.40,99.03 L95.53,101.35 L97.67,103.62 L99.80,105.84 L101.93,108.02 L104.07,110.16 L106.20,112.26 L108.33,114.32 L110.47,116.34 L112.60,118.32 L114.73,120.27 L116.87,122.18 L119.00,124.06 L121.13,125.91 L123.27,127.73 L125.40,129.52 L127.53,131.28 L129.67,133.01 L131.80,134.72 L133.93,136.40 L136.07,138.05 L138.20,139.68 L140.33,141.28 L142.47,142.86 L144.60,144.41 L146.73,145.94 L148.87,147.44 L151.00,148.93 L153.13,150.38 L155.27,151.82 L157.40,153.23 L159.53,154.62 L161.67,155.98 L163.80,157.33 L165.93,158.65 L168.07,159.94 L170.20,161.22 L172.33,162.47 L174.47,163.70 L176.60,164.92 L178.73,166.10 L180.87,167.27 L183.00,168.42 L185.13,169.54 L187.27,170.65 L189.40,171.74 L191.53,172.80 L193.67,173.85 L195.80,174.87 L197.93,175.88 L200.07,176.87 L202.20,177.84 L204.33,178.79 L206.47,179.73 L208.60,180.65 L210.73,181.55 L212.87,182.43 L215.00,183.30 L217.13,184.15 L219.27,184.98 L221.40,185.80 L223.53,186.61 L225.67,187.40 L227.80,188.17 L229.93,188.93 L232.07,189.67 L234.20,190.41 L236.33,191.12 L238.47,191.83 L240.60,192.52 L242.73,193.20 L244.87,193.87 L247.00,194.52 L249.13,195.16 L251.27,195.79 L253.40,196.41 L255.53,197.02 L257.67,197.62 L259.80,198.20 L261.93,198.78 L264.07,199.34 L266.20,199.90 L268.33,200.44 L270.47,200.98 L272.60,201.50 L274.73,202.02 L276.87,202.52 L279.00,203.02 L281.13,203.51 L283.27,203.99 L285.40,204.46 L287.53,204.93 L289.67,205.38 L291.80,205.83 L293.93,206.27 L296.07,206.71 L298.20,207.13 L300.33,207.55 L302.47,207.96 L304.60,208.37 L306.73,208.76 L308.87,209.16 L311.00,209.54 L313.13,209.92 L315.27,210.29 L317.40,210.66 L319.53,211.02 L321.67,211.37 L323.80,211.72 L325.93,212.06 L328.07,212.40 L330.20,212.73 L332.33,213.06 L334.47,213.38 L336.60,213.70 L338.73,214.01 L340.87,214.31 L343.00,214.62 L345.13,214.91 L347.27,215.21 L349.40,215.50 L351.53,215.78 L353.67,216.06 L355.80,216.33 L357.93,216.61 L360.07,216.87 L362.20,217.14 L364.33,217.40 L366.47,217.65 L368.60,217.90 L370.73,218.15 L372.87,218.40 L375.00,218.64 L377.13,218.88 L379.27,219.11 L381.40,219.34 L383.53,219.57 L385.67,219.79 L387.80,220.01 L389.93,220.23 L392.07,220.45 L394.20,220.66 L396.33,220.87 L398.47,221.08 L400.60,221.28 L402.73,221.48 L404.87,221.68 L407.00,221.87 L409.13,222.07 L411.27,222.26 L413.40,222.45 L415.53,222.63 L417.67,222.81 L419.80,222.99 L421.93,223.17 L424.07,223.35 L426.20,223.52 L428.33,223.69 L430.47,223.86 L432.60,224.03 L434.73,224.20 L436.87,224.36 L439.00,224.52 L441.13,224.68 L443.27,224.83 L445.40,224.99 L447.53,225.14 L449.67,225.29 L451.80,225.44 L453.93,225.59 L456.07,225.74 L458.20,225.88 L460.33,226.02 L462.47,226.16 L464.60,226.30 L466.73,226.44 L468.87,226.57 L471.00,226.71 L473.13,226.84 L475.27,226.97 L477.40,227.10 L479.53,227.23 L481.67,227.36 L483.80,227.48 L485.93,227.60 L488.07,227.73 L490.20,227.85 L492.33,227.97 L494.47,228.09 L496.60,228.20 L498.73,228.32 L500.87,228.43 L503.00,228.54 L505.13,228.66 L507.27,228.77 L509.40,228.88 L511.53,228.98 L513.67,229.09 L515.80,229.20 L517.93,229.30 L520.07,229.41 L522.20,229.51 L524.33,229.61 L526.47,229.71 L528.60,229.81 L530.73,229.91 L532.87,230.00 L535.00,230.10 L537.13,230.20 L539.27,230.29 L541.40,230.38 L543.53,230.48 L545.67,230.57 L547.80,230.66 L549.93,230.75 L552.07,230.84 L554.20,230.92 L556.33,231.01 L558.47,231.10 L560.60,231.18 L562.73,231.27 L564.87,231.35 L567.00,231.43 L569.13,231.51 L571.27,231.59 L573.40,231.67 L575.53,231.75 L577.67,231.83 L579.80,231.91 L581.93,231.99 L584.07,232.06 L586.20,232.14 L588.33,232.21 L590.47,232.29 L592.60,232.36 L594.73,232.44 L596.87,232.51 L599.00,232.58 L601.13,232.65 L603.27,232.72 L605.40,232.79 L607.53,232.86 L609.67,232.93 L611.80,233.00 L613.93,233.06 L616.07,233.13 L618.20,233.20 L620.33,233.26 L622.47,233.33 L624.60,233.39 L626.73,233.45 L628.87,233.52 L631.00,233.58 L633.13,233.64 L635.27,233.70 L637.40,233.76 L639.53,233.82 L641.67,233.88 L643.80,233.94 L645.93,234.00 L648.07,234.06 L650.20,234.12 L652.33,234.17 L654.47,234.23 L656.60,234.29 L658.73,234.34 L660.87,234.40 L663.00,234.45 L665.13,234.51 L667.27,234.56 L669.40,234.62 L671.53,234.67 L673.67,234.72 L675.80,234.77 L677.93,234.83 L680.07,234.88 L682.20,234.93 L684.33,234.98 L686.47,235.03 L688.60,235.08 L690.73,235.13 L692.87,235.18 L695.00,235.23" fill="none" stroke="#657e70" stroke-width="2.7"/>
-<g fill="#78776d" font-size="11" text-anchor="middle"><text x="55.0" y="266">0</text><text x="161.66666666666666" y="266">50</text><text x="268.3333333333333" y="266">100</text><text x="375.0" y="266">150</text><text x="481.66666666666663" y="266">200</text><text x="588.3333333333334" y="266">250</text><text x="695.0" y="266">300</text><text x="375" y="287">Epoch</text></g><text x="10" y="18" font-size="11" fill="#78776d">BCE</text><text x="565" y="215" font-size="12" fill="#425e50">最终 L = 0.027927</text></svg><figcaption>图 1：由 experiments.json 中的逐轮实测损失生成。</figcaption></figure>
-<div class="table-scroll"><table><thead><tr><th>输入</th><th>目标</th><th>初始 P(1)</th><th>第 300 轮 P(1)</th><th>最终分类</th></tr></thead><tbody><tr><td>[0, 0]</td><td>0</td><td>0.29186333</td><td>0.02872041</td><td>0</td></tr><tr><td>[0, 1]</td><td>1</td><td>0.45895590</td><td>0.97454104</td><td>1</td></tr><tr><td>[1, 0]</td><td>1</td><td>0.45895590</td><td>0.97454104</td><td>1</td></tr><tr><td>[1, 1]</td><td>0</td><td>0.29186333</td><td>0.03051269</td><td>0</td></tr></tbody></table></div>
-<h3>九个参数的学习结果</h3><div class="table-scroll"><table><thead><tr><th>参数</th><th>初始值</th><th>第 300 轮</th></tr></thead><tbody><tr><td>W[1,1]</td><td>+2.00000000</td><td>+6.13708247</td></tr><tr><td>W[1,2]</td><td>-2.00000000</td><td>-6.01402992</td></tr><tr><td>W[2,1]</td><td>-2.00000000</td><td>-6.01402992</td></tr><tr><td>W[2,2]</td><td>+2.00000000</td><td>+6.13708247</td></tr><tr><td>bₕ[1]</td><td>-1.00000000</td><td>-3.47272203</td></tr><tr><td>bₕ[2]</td><td>-1.00000000</td><td>-3.47272203</td></tr><tr><td>v[1]</td><td>+3.00000000</td><td>+8.19176277</td></tr><tr><td>v[2]</td><td>+3.00000000</td><td>+8.19176277</td></tr><tr><td>bₒ</td><td>-2.50000000</td><td>-4.01412444</td></tr></tbody></table></div>
-<p>训练后 h₁ 对输入 (1,0) 的激活约为 0.934891，h₂ 对 (0,1) 的激活同样较高；(0,0) 与 (1,1) 的两个隐藏激活都较低。输出层将两个中间特征组合起来，实现 XOR 分类。此处是连续的 Sigmoid 表示，并非直接把隐藏单元设为逻辑门。</p>
+    <section class="section">
+      <h2>对照结果</h2>
+      <p>各组使用相同的四个样本，整批训练 300 轮。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">配置</th><th scope="col">初始 BCE</th><th scope="col">最终 BCE</th><th scope="col">训练准确率</th></tr></thead>
+          <tbody><tr><td>课程配置 · Adam 0.03</td><td>0.561960</td><td>0.027927</td><td>100%</td></tr>
+<tr><td>较小学习率 · Adam 0.003</td><td>0.561960</td><td>0.341754</td><td>100%</td></tr>
+<tr><td>较大学习率 · Adam 0.3</td><td>0.561960</td><td>0.000931</td><td>100%</td></tr>
+<tr><td>优化器对照 · SGD 0.03</td><td>0.561960</td><td>0.461865</td><td>100%</td></tr>
+<tr><td>随机初始化 · 2 隐藏单元</td><td>0.731391</td><td>0.358619</td><td>50%</td></tr>
+<tr><td>线性对照 · 无隐藏层</td><td>0.693147</td><td>0.693147</td><td>50%</td></tr></tbody>
+        </table>
+      </div>
+      <ul>
+        <li>在课程初始化下，Adam 学习率 0.3 在 300 轮时的损失最低。同为 0.03 时，Adam 的最终损失低于 SGD。</li>
+        <li>种子 42 随机初始化的两隐藏单元模型，在 300 轮内达到 50% 训练准确率。</li>
+        <li>零初始化的线性模型梯度为 0，损失保持在 ln 2。XOR 两类样本分布在对角，线性边界无法完全分开。</li>
+      </ul>
+      <p>实验只使用四个布尔输入，报告中的准确率均为训练准确率。</p>
+    </section>
 
-<h2>五、对照实验与分析</h2><p>除所列变量外，各组使用同样的数据、轮数和损失。随机初始化固定种子 42；无隐藏层对照使用零初始化逻辑回归，参数只有 3 个。</p>
-<div class="table-scroll"><table><thead><tr><th>设置</th><th>初始 BCE</th><th>最终 BCE</th><th>训练准确率</th></tr></thead><tbody><tr><td>课程配置 · Adam 0.03</td><td>0.561960</td><td>0.027927</td><td>100%</td></tr><tr><td>较小学习率 · Adam 0.003</td><td>0.561960</td><td>0.341754</td><td>100%</td></tr><tr><td>较大学习率 · Adam 0.3</td><td>0.561960</td><td>0.000931</td><td>100%</td></tr><tr><td>优化器对照 · SGD 0.03</td><td>0.561960</td><td>0.461865</td><td>100%</td></tr><tr><td>随机初始化 · 2 隐藏单元</td><td>0.731391</td><td>0.358619</td><td>50%</td></tr><tr><td>线性对照 · 无隐藏层</td><td>0.693147</td><td>0.693147</td><td>50%</td></tr></tbody></table></div>
-<ol><li><b>学习率：</b>在这组数据和初始化下，0.003 的下降较慢，0.3 在 300 轮内的损失更低。这是本实验的局部结论，不能推导出学习率越大越好。</li><li><b>优化器：</b>同为 0.03 学习率时，SGD 的最终 BCE 高于 Adam。两者更新规则不同，相同学习率并不意味着相同步长。</li><li><b>初始化：</b>固定种子 42 的两隐藏单元模型在 300 轮后只有 50% 准确率，说明网络具有表达能力并不保证某次优化能成功。可在网页中增加轮数或隐藏单元进一步比较。</li><li><b>结构：</b>无隐藏层时，零参数对四个样本均给出 0.5，平均 BCE 为 ln 2 ≈ 0.693147，梯度为零。这是逻辑回归在对称 XOR 数据上的最优平均损失；一般线性分类器可以分对其中 3 个点，但无法同时分对全部四个点。此对照的 50% 是 BCE 最优状态按 ≥0.5 阈值分类的结果，并非所有线性参数的准确率上限。</li></ol>
-
-<h2>六、可视化设计与操作</h2><ol><li>打开网站，点击“开始训练”，观察 BCE、四个样本的概率及分类结果；可暂停或单步执行。</li><li>决策图的颜色表示 P(1)，白线表示 P(1)=0.5；图中的四个标记才是训练样本。</li><li>网络图的连线颜色表示权重正负，粗细表示绝对值；节点内是当前选择输入的激活值。点击样本或图上任意位置可改变观察输入。</li><li>拖动“回看训练”滑块，检查历史参数、损失和预测；参数表给出初始值、当前值、当前梯度及上一次实际更新。</li><li>改变隐藏单元、优化器、学习率、激活函数或初始化后自动重置，避免混用不同配置的训练记录。可导出 CSV 和模型 JSON。</li></ol>
-
-<h2>七、复现与验证</h2><pre># 任选一个 Python 框架
+    <section class="section">
+      <h2>复现与验证</h2>
+      <p>下载任一脚本，在对应 Python 环境中运行。脚本输出预测、参数和训练 CSV，安装 matplotlib 后附带训练图。</p>
+      <pre># PyTorch
 python -m pip install torch matplotlib
 python xor_torch.py --epochs 300 --lr 0.03
 
+# TensorFlow
 python -m pip install tensorflow matplotlib
-python xor_tensorflow.py --epochs 300 --lr 0.03
-
-# 仓库中运行网页核心的数值自检与对照实验生成
-node mlp/verify.cjs
-python mlp/build-report.py</pre>
-<p>已实际运行 PyTorch 2.14.0+cu130，采用 CPU、float64。其最终 BCE 为 0.02792652607940487，与浏览器实现相差 8.33e-17；四个概率最大绝对差小于 10⁻¹⁵。PyTorch 的原始 <a href="downloads/torch-results/torch-history.csv" download>301 行训练记录</a>、<a href="downloads/torch-results/torch-result.json">结果 JSON</a> 和训练图均随作业提供。</p>
-<figure><img src="downloads/torch-results/torch-learning.png" alt="实际运行PyTorch生成的损失曲线与XOR决策边界" width="1800" height="720"><figcaption>图 2：PyTorch 脚本实际运行生成的结果；圆点与菱形区分两类目标。</figcaption></figure>
-<p>针对 0、2、4、8 隐藏单元及 Sigmoid / Tanh 的手写梯度，中央有限差分的最大绝对误差约 1.18×10⁻¹¹；另检查了 160 组配置均无非有限损失，并验证 Adam 首步公式与固定配置的可复现性。TensorFlow 脚本已做语法检查，本次环境未安装 TensorFlow，尚未执行；其原生 Adam 的 ε 约定与 PyTorch 也可能产生微小数值差异。</p>
-
-<h2>八、学习总结与边界</h2><p>这次实验把“神经网络学习”拆成了可检查的数值过程：前向计算产生预测，损失把预测与标签联系起来，反向传播提供每个参数的梯度，优化器依据梯度更新参数。隐藏层提供解决 XOR 的非线性表示，初始化和优化设置决定训练能否有效找到它。</p>
-<p>本作业没有独立测试集；100% 是全部四个布尔输入的训练准确率。连续决策图是模型在布尔样本之间的插值，不是额外测试证据。此实验用于理解参数学习，不代表模型已具备复杂任务的泛化能力。</p>
-
-<h2>参考与实现说明</h2><ol><li><a href="https://zhumy.github.io/Introduction_to_Artificial_Intelligence/#chapter-15">《人工智能概论》第二篇第 15 节</a>，第 66 页“多层网络怎样学习参数？Python 实现与反向传播”。网页核对日期：2026-11-17。</li><li><a href="https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html">PyTorch Adam 文档</a>；<a href="https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/Adam">TensorFlow Adam 文档</a>。</li><li><a href="https://github.com/pwicdsummer/mako-agent-report/tree/main/mlp">本作业的公开实现与数据</a>。课程给定网络、数据与初始化作为复现起点；网页手写计算核心、可视化、对照实验和报告在 AI Agent 辅助下完成，数值结果由实际运行生成。</li></ol>
-<p class="note">本报告与交互页面使用相同实验数据。回到 <a href="./">学习实验室</a>，或查看 <a href="../">第一次作业</a>。</p>
-</main></body></html>
+python xor_tensorflow.py --epochs 300 --lr 0.03</pre>
+      <p>PyTorch CPU 的最终 BCE 与网页实现相差 8.3e-17。网页梯度的中央有限差分最大绝对误差为 1.18 × 10⁻¹¹。TensorFlow 脚本通过语法检查，运行待验证。</p>
+      <ul class="resource-list">
+        <li><a href="downloads/xor_torch.py" download>PyTorch 脚本</a></li>
+        <li><a href="downloads/xor_tensorflow.py" download>TensorFlow 脚本</a></li>
+        <li><a href="downloads/torch-results/torch-history.csv" download>训练记录（CSV）</a></li>
+        <li><a href="experiments.json" download>对照结果（JSON）</a></li>
+        <li><a href="https://zhumy.github.io/Introduction_to_Artificial_Intelligence/#chapter-15">课程讲义 · 第 15 节</a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
